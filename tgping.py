@@ -76,6 +76,28 @@ def esc(s):
     return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
+def social_lines(c):
+    """The coin's own X/Twitter, Telegram and site, plus an X search for its
+    contract address (shows what people post about it, newest first)."""
+    out = []
+    links = c.get("links") or []
+    x = [u for u in links if "x.com/" in u or "twitter.com/" in u]
+    tg = [u for u in links if "t.me/" in u]
+    other = [u for u in links if u not in x and u not in tg]
+    out.append(f"🐦 X: {esc(x[0])}" if x else "🐦 X: none listed")
+    if len(x) > 1:
+        out.append(f"🐦 also: {esc(x[1])}")
+    if tg:
+        out.append(f"💬 TG: {esc(tg[0])}")
+    if other:
+        out.append(f"🌐 Site: {esc(other[0])}")
+    q = urllib.parse.quote(c["addr"])
+    out.append(f"🔎 Posts about it: https://x.com/search?q={q}&amp;f=live")
+    sym = urllib.parse.quote("$" + c["symbol"])
+    out.append(f"🔎 ${esc(c['symbol'])} on X: https://x.com/search?q={sym}&amp;f=live")
+    return out
+
+
 def message(c, upgrade):
     band = "🟢 STRONG" if c["score"] >= STRONG else "👀 WATCH"
     lane = {"new": "NEW", "family": "FAMILY"}.get(c["lane"], "WAKING UP")
@@ -102,6 +124,7 @@ def message(c, upgrade):
             lines.append(f"💬 Holders say: {esc(st['thesis'][:200])}")
     lines.append("")
     lines.append(f"<code>{esc(c['addr'])}</code>")
+    lines += social_lines(c)
     lines.append(esc(c["url"]))
     lines.append("Exit plan: sell half at 2x, rest if it drops 30% from its high. Not advice.")
     return "\n".join(lines)[:4000]

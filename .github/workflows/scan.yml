@@ -47,7 +47,7 @@ jobs:
             echo "No Claude token secret: stories are off."
           fi
 
-      - name: Scan every 5 minutes
+      - name: Scan every 10 minutes
         id: loop
         env:
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
