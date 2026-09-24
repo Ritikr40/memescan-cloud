@@ -1,0 +1,6 @@
+# state lives in the GitHub Actions cache, never in this public repo
+*.json
+*.jsonl
+*.txt
+story_runs/
+__pycache__/

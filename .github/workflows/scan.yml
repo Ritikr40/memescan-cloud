@@ -1,0 +1,87 @@
+name: memescan
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 * * * *"      # backup restart if the chain ever breaks
+
+concurrency:
+  group: memescan
+  cancel-in-progress: false
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Restore saved state (stories, holders, sent pings, history)
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            new_state.json
+            stories.json
+            scan_cache.json
+            tg_sent.json
+            new_history.jsonl
+          key: memescan-state-${{ github.run_id }}
+          restore-keys: memescan-state-
+
+      - name: Install Claude Code (for coin stories)
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          if [ -n "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
+            curl -fsSL https://claude.ai/install.sh | bash
+            echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          else
+            echo "No Claude token secret: stories are off."
+          fi
+
+      - name: Scan every 5 minutes
+        id: loop
+        env:
+          TG_TOKEN: ${{ secrets.TG_TOKEN }}
+          TG_CHAT: ${{ secrets.TG_CHAT }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          LOOP_MINUTES: ${{ vars.LOOP_MINUTES || '330' }}
+        run: bash loop.sh
+
+      - name: Save state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            new_state.json
+            stories.json
+            scan_cache.json
+            tg_sent.json
+            new_history.jsonl
+          key: memescan-state-${{ github.run_id }}
+
+      - name: Keep the pick history for report cards
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: history-${{ github.run_id }}
+          path: |
+            new_history.jsonl
+            latest.txt
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Start the next job
+        # only after a normal finish, so a broken setup cannot start jobs in a loop
+        if: always() && steps.loop.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run scan.yml --ref "${{ github.ref_name }}" -R "${{ github.repository }}"
