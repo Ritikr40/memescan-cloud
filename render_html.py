@@ -618,7 +618,7 @@ def _meter_new(parts, total):
 def _story(st, score):
     if not st:
         note = ("Story not looked up yet. It will be on the next run."
-                if score >= 50 else "No story lookup: score is below 50.")
+                if score >= 60 else "No story lookup: only coins scoring 60+ get one.")
         return f'<div class="storybox"><p class="lab">The story</p><p class="pending">{note}</p></div>'
     if st.get("error"):
         return (f'<div class="storybox"><p class="lab">The story</p>'
