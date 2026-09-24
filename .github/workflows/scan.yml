@@ -43,6 +43,8 @@ jobs:
           if [ -n "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
             curl -fsSL https://claude.ai/install.sh | bash
             echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+            # tiny login check, once per job (~every 5.5 h)
+            cd "$RUNNER_TEMP" && "$HOME/.local/bin/claude" -p "Reply with the word OK" --model haiku               --setting-sources project --strict-mcp-config --tools "" --no-session-persistence               | head -c 200 && echo " <- Claude login check" || echo "Claude login check FAILED"
           else
             echo "No Claude token secret: stories are off."
           fi
