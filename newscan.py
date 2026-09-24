@@ -69,7 +69,7 @@ STRONG = 60
 SHOW_TOP = 10
 
 # ---- stories --------------------------------------------------------------
-STORY_MIN_SCORE = 50
+STORY_MIN_SCORE = 60           # only coins whose numbers alone reach STRONG get a Claude story
 MAX_STORIES_PER_RUN = 1       # scan runs every 5 min; the 20/day cap still holds
 STORY_DAILY_CAP = 20          # most lookups in any 24 hours
 STORY_TIMEOUT = 300
