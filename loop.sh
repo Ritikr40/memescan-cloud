@@ -8,7 +8,8 @@ while [ "$(date +%s)" -lt "$END" ]; do
   echo "=== scan $(date -u '+%H:%M') UTC ==="
   timeout 480 python3 newscan.py --tg > latest.txt 2> scan_err.txt
   grep -E "^[0-9]+\. \$|coin\(s\) worth|Nothing worth" latest.txt || true
-  grep -E "telegram|FATAL|Traceback" scan_err.txt || true
+  grep -E "telegram|FATAL|researching" scan_err.txt || true
+  grep -q Traceback scan_err.txt && tail -25 scan_err.txt
   wait_s=$(( ${SCAN_EVERY:-600} - ($(date +%s) - start) ))
   [ "$wait_s" -gt 0 ] && sleep "$wait_s"
 done
