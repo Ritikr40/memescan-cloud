@@ -560,12 +560,12 @@ def add_holders(cands, state):
         snaps = [x for x in hist.get(key, []) if now - x[0] < HOLDER_KEEP_H * 3600]
         older = [x for x in snaps if now - x[0] >= 1800]
         if older:
-            t0, n0 = older[-1]
+            t0, n0 = older[-1][0], older[-1][1]
             per_h = (count - n0) / ((now - t0) / 3600)
             c["holders_per_h"] = round(per_h, 1)
             # speeding up or slowing down: compare with the rate before that
             if len(older) >= 2:
-                t1, n1 = older[-2]
+                t1, n1 = older[-2][0], older[-2][1]
                 if t0 - t1 >= 1800:
                     before = (n0 - n1) / ((t0 - t1) / 3600)
                     c["holders_accel"] = round(per_h / before, 2) if before > 0 else None
