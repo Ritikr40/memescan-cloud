@@ -3,7 +3,8 @@ name: memescan
 on:
   workflow_dispatch:
   schedule:
-    - cron: "17 * * * *"      # backup restart if the chain ever breaks
+    - cron: "30 5 * * *"       # 11:00 AM IST: start the day after quiet hours
+    - cron: "17 6-19 * * *"    # backup restart if the chain ever breaks (awake hours only)
 
 concurrency:
   group: memescan
@@ -14,7 +15,20 @@ permissions:
   contents: read
 
 jobs:
+  hours:
+    # quiet hours: no scans from 2 AM to 11 AM IST (see quiet.py)
+    runs-on: ubuntu-latest
+    outputs:
+      quiet: ${{ steps.check.outputs.quiet }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: check
+        run: |
+          if python3 quiet.py; then echo "quiet=yes" >> "$GITHUB_OUTPUT"; echo "Quiet hours: no scan."; else echo "quiet=no" >> "$GITHUB_OUTPUT"; fi
+
   scan:
+    needs: hours
+    if: needs.hours.outputs.quiet == 'no'
     runs-on: ubuntu-latest
     timeout-minutes: 350
     steps:
@@ -86,4 +100,6 @@ jobs:
         if: always() && steps.loop.outcome == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run scan.yml --ref "${{ github.ref_name }}" -R "${{ github.repository }}"
+        run: |
+          if python3 quiet.py; then echo "Quiet hours began: the 11 AM IST cron starts tomorrow's chain."; exit 0; fi
+          gh workflow run scan.yml --ref "${{ github.ref_name }}" -R "${{ github.repository }}"
