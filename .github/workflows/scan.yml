@@ -12,7 +12,7 @@ concurrency:
 
 permissions:
   actions: write
-  contents: read
+  contents: write      # publish.sh pushes the website to the gh-pages branch
 
 jobs:
   hours:
@@ -47,6 +47,8 @@ jobs:
             scan_cache.json
             tg_sent.json
             new_history.jsonl
+            track.json
+            board.json
           key: memescan-state-${{ github.run_id }}
           restore-keys: memescan-state-
 
@@ -70,6 +72,7 @@ jobs:
           TG_CHAT: ${{ secrets.TG_CHAT }}
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           LOOP_MINUTES: ${{ vars.LOOP_MINUTES || '330' }}
+          GH_TOKEN: ${{ github.token }}
         run: bash loop.sh
 
       - name: Save state
@@ -82,6 +85,8 @@ jobs:
             scan_cache.json
             tg_sent.json
             new_history.jsonl
+            track.json
+            board.json
           key: memescan-state-${{ github.run_id }}
 
       - name: Keep the pick history for report cards
@@ -91,6 +96,7 @@ jobs:
           name: history-${{ github.run_id }}
           path: |
             new_history.jsonl
+            track.json
             latest.txt
           retention-days: 14
           if-no-files-found: ignore

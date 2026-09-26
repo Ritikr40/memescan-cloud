@@ -10,9 +10,12 @@ while [ "$(date +%s)" -lt "$END" ]; do
   if quiet; then echo "=== quiet hours (2 AM - 11 AM IST): stopping ==="; break; fi
   start=$(date +%s)
   echo "=== scan $(date -u '+%H:%M') UTC ==="
-  timeout 480 python3 newscan.py --tg > latest.txt 2> scan_err.txt
+  timeout 480 python3 newscan.py --tg --site > latest.txt 2> scan_err.txt
+  # report card + website, never allowed to stop the scanning
+  timeout 150 python3 tracker.py 2>> scan_err.txt || echo "tracker failed"
+  python3 site.py 2>> scan_err.txt && bash publish.sh >/dev/null 2>> scan_err.txt || echo "website update failed"
   grep -E "^[0-9]+\. \$|coin\(s\) worth|Nothing worth" latest.txt || true
-  grep -E "telegram|FATAL|researching" scan_err.txt || true
+  grep -E "telegram|FATAL|researching|tracker:|site:|publish" scan_err.txt || true
   grep -q Traceback scan_err.txt && tail -25 scan_err.txt
   wait_s=$(( ${SCAN_EVERY:-600} - ($(date +%s) - start) ))
   [ "$wait_s" -gt 0 ] && sleep "$wait_s"

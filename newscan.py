@@ -64,6 +64,20 @@ MIN_VOL24 = 100_000
 MIN_TXNS6 = 150               # trades in the last 6 hours
 EXIT_DANGER = 60              # size / liquidity above this = hard to sell
 
+# Rules from the 26 Sep 2026 report card (438 calls, 68 winners):
+EARLY_MIN_SIZE = 100_000      # change 5: small coins get in early if they are very busy
+EARLY_MIN_TXNS6 = 1000
+EARLY_MIN_VOL24 = 250_000
+EARLY_MIN_LIQ = 30_000
+RH_MIN_LIQ = 75_000           # change 6: Robinhood Chain rugged 70% of the time
+RH_MIN_TXNS6 = 300
+YOUNG_HOURS = 6               # change 4: coins this young won only 12% of the time
+SPIKE_ACCEL = 5.0             # change 4: an hour this much busier than normal = pump risk
+STILL_HERE_HOURS = 2          # change 3: on the board this long ...
+STILL_HERE_SCANS = 8          # ... and in this many scans = a second, "still here" ping
+COPY_KEEP_H = 72              # change 2: remember tickers this long to spot copies
+COPY_LIQ_SHARE = 0.5          # under half the pool money of the biggest same-ticker coin = copy
+
 MIN_SCORE = 45
 STRONG = 60
 SHOW_TOP = 10
@@ -165,9 +179,11 @@ def collect(cache):
 
     start = cache.get("gt_slot", 0) % len(GT_SLOTS)
     slots = [GT_SLOTS[(start + i) % len(GT_SLOTS)] for i in range(GT_SLOTS_PER_RUN)]
-    # Solana 1h is where new runners show first: read it every run
+    # Solana 1h is where new runners show first, and the 5-minute list catches
+    # news coins (e/acc, Super Inu) in their first hour: read both every run
     if ("solana", "1h", 1) not in slots:
         slots.append(("solana", "1h", 1))
+    slots.append(("solana", "5m", 1))
     cache["gt_slot"] = start + GT_SLOTS_PER_RUN
     for chain, dur, page in slots:
         net = GT_NETWORKS[chain]
@@ -384,17 +400,27 @@ def measure(p, born_ms, item):
     }
 
 
+def early_ok(m):
+    """Change 5: a small coin that is already very busy gets in before $250K."""
+    return (m["mcap"] >= EARLY_MIN_SIZE and m["txns6"] >= EARLY_MIN_TXNS6 and m["v24"] >= EARLY_MIN_VOL24
+            and m["liq"] >= EARLY_MIN_LIQ and m["buy1"] >= 0.55 and m["age_h"] <= NEW_MAX_HOURS)
+
+
 def lane_for(m, role=None):
     """'new', 'waking', 'family', or a reason it was skipped."""
     if m["mcap"] < MIN_SIZE:
+        if early_ok(m):
+            m["early"] = True
+            return "new"
         return "small"
     if role == "parent" and m["age_h"] <= FAMILY_MAX_HOURS and m["mcap"] <= FAMILY_MAX_SIZE             and m["liq"] >= MIN_LIQ and m["v24"] >= MIN_VOL24:
         return "family"
     if m["mcap"] > MAX_SIZE:
         return "big"
-    if m["liq"] < MIN_LIQ:
+    rh = m["chain"] == "robinhood"
+    if m["liq"] < (RH_MIN_LIQ if rh else MIN_LIQ):
         return "illiquid"
-    if m["v24"] < MIN_VOL24 or m["txns6"] < MIN_TXNS6:
+    if m["v24"] < MIN_VOL24 or m["txns6"] < (RH_MIN_TXNS6 if rh else MIN_TXNS6):
         return "quiet"
     if m["age_h"] <= NEW_MAX_HOURS:
         return "new"
@@ -447,6 +473,12 @@ def score(m):
         penalties["dumping_now"] = -12
     if not m["socials"]:
         penalties["no_community"] = -8
+    if m["age_h"] < YOUNG_HOURS:
+        penalties["very_young"] = -6
+        if m["chain"] == "robinhood":
+            penalties["young_robinhood"] = -4
+    if m["accel"] >= SPIKE_ACCEL:
+        penalties["spike"] = -6
 
     total = sum(parts.values()) + sum(penalties.values())
     return clamp(total, 0, 100), parts, penalties
@@ -513,8 +545,15 @@ def thesis(m, lane, penalties):
         warn.append("No Twitter or Telegram. A story with no community usually dies.")
     if m["boosted"]:
         warn.append("Someone paid DexScreener to boost it. Paid ads are not real demand.")
+    if m.get("early"):
+        why.insert(0, f"EARLY: only {money(m['mcap'])}, but already {m['txns6']:,.0f} trades in 6 hours.")
+    if "spike" in penalties:
+        warn.append(f"Sudden spike: this hour is {m['accel']:.0f}x busier than normal. "
+                    f"In our test, spikes like this were more often pump-and-dumps than real runs.")
     if m["age_h"] < 6:
-        warn.append("Less than 6 hours old. Most coins this young go to zero.")
+        warn.append("Less than 6 hours old. In our test only 12% of coins this young became winners.")
+    if "young_robinhood" in penalties:
+        warn.append("Young Robinhood Chain coin. 70% of Robinhood calls rugged in our test.")
     return why, warn
 
 
@@ -595,7 +634,11 @@ def adjust_for_holders_and_family(c):
         why.append(line + ".")
         if ph is not None:
             rate = ph / c["holders"]
-            if rate >= 0.02:
+            if rate >= 0.05:
+                pen["holders_growing"] = 9
+                why.append(f"New holders are pouring in ({rate*100:.1f}% more per hour). "
+                           f"This is how news coins look early.")
+            elif rate >= 0.02:
                 pen["holders_growing"] = 5
                 why.append(f"New holders are arriving fast ({rate*100:.1f}% more per hour). People are still coming in.")
             elif ph < 0:
@@ -709,14 +752,11 @@ def add_stories(cands, allow_research):
             save_json(STORY_FILE, stories)
         c["story"] = have
 
-        # The story counts. Busy trading with no real story behind it is how
-        # most pump-and-dumps look, so a weak story can never be STRONG.
+        # The story is for reading, not for scoring: in the 26 Sep report card
+        # Claude called the story "weak" for 22 of 23 winners (Super Inu, CALI ...).
         words = ((have or {}).get("verdict") or "").split()
         verdict = words[0].strip(".,:;").lower() if words else ""
-        if verdict == "weak":
-            c["penalties"]["weak_story"] = -15
-            c["warn"].insert(0, "Claude found no real story behind this coin. Read the story box before anything else.")
-        elif verdict == "strong":
+        if verdict == "strong":
             c["penalties"]["strong_story"] = 5      # a bonus, kept with the other adjustments
             c["why"].insert(0, "Claude found a real story people are sharing on their own.")
         att = ((have or {}).get("attention") or "").lower()
@@ -727,26 +767,69 @@ def add_stories(cands, allow_research):
             c["penalties"]["attention_down"] = -8
             c["warn"].insert(0, "Claude found attention SLOWING DOWN. The crowd may be leaving.")
         c["score"] = clamp(sum(c["parts"].values()) + sum(c["penalties"].values()), 0, 100)
-        # STRONG means good numbers AND a checked story that is not weak.
-        # Until Claude has looked, a coin can only be WATCH.
-        checked = bool(have) and not have.get("error")
-        if verdict == "weak" or not checked:
-            c["score"] = min(c["score"], STRONG - 1)
-        if not checked and c["score"] >= STORY_MIN_SCORE:
-            c["warn"].insert(0, "Story not checked yet, so this cannot be STRONG. It gets checked on a coming run.")
-
-    # Same ticker twice on the board: at least one of them is usually a copy.
-    by_symbol = {}
-    for c in cands:
-        by_symbol.setdefault(c["symbol"].upper().lstrip("$"), []).append(c)
-    for same in by_symbol.values():
-        if len(same) > 1:
-            for c in same:
-                c["warn"].insert(0, f"{len(same)} different coins called ${c['symbol']} are on this board. "
-                                    f"One is probably a copy. Check the contract address before buying.")
 
     cands.sort(key=lambda c: -c["score"])
     return done
+
+
+# ---- copies and "still here" ---------------------------------------------
+
+def sym_key(s):
+    return (s or "").upper().lstrip("$").strip()
+
+
+def drop_copies(cands, measured, state, skipped):
+    """Change 2: when a name gets hot, dozens of copies launch. In the 26 Sep
+    report card Super Inu was called 10 times and only the 3 real ones won.
+    The original is the same-ticker coin with the most money in its pool,
+    counting every coin with that ticker seen in the last 3 days."""
+    now = time.time()
+    book = state.setdefault("tickers", {})
+    # every coin looked at this scan counts, so a big original that is too
+    # large for the board still marks its small copies
+    for c in measured:
+        if c["liq"] >= 20_000 and c["v24"] >= 50_000:
+            book.setdefault(sym_key(c["symbol"]), {})[f"{c['chain']}:{c['addr']}"] = {"liq": c["liq"], "t": now}
+    for c in cands:
+        book.setdefault(sym_key(c["symbol"]), {})[f"{c['chain']}:{c['addr']}"] = {"liq": c["liq"], "t": now}
+    for sym in list(book):
+        book[sym] = {k: v for k, v in book[sym].items() if now - v["t"] < COPY_KEEP_H * 3600}
+        if not book[sym]:
+            del book[sym]
+    keep = []
+    for c in cands:
+        others = book.get(sym_key(c["symbol"]), {})
+        best_key, best = max(others.items(), key=lambda kv: kv[1]["liq"])
+        if best_key != f"{c['chain']}:{c['addr']}" and c["liq"] < best["liq"] * COPY_LIQ_SHARE:
+            skipped["copy"] += 1
+            continue
+        if len(others) > 1:
+            c["why"].append(f"Original ${c['symbol']}: {len(others) - 1} other coin(s) with this name were seen "
+                            f"in the last 3 days, and this one has the most money in its pool.")
+        keep.append(c)
+    return keep
+
+
+def still_here(cands, state):
+    """Change 3: winners stayed on the board (median 5 scans vs 2 for losers).
+    A coin still passing every filter hours later gets a bonus and a second ping."""
+    now = time.time()
+    board = state.setdefault("board", {})
+    for c in cands:
+        b = board.setdefault(f"{c['chain']}:{c['addr']}", {"first": now, "n": 0})
+        b["n"] += 1
+        b["last"] = now
+        c["board_n"] = b["n"]
+        c["board_h"] = (now - b["first"]) / 3600
+        if c["board_h"] >= STILL_HERE_HOURS and c["board_n"] >= STILL_HERE_SCANS:
+            c["still_here"] = True
+            c["penalties"]["still_here"] = 6
+            c["why"].insert(0, f"STILL HERE: on the board for {c['board_h']:.0f} hours ({c['board_n']} scans). "
+                               f"Coins that stay this long won far more often in our test.")
+            c["score"] = clamp(sum(c["parts"].values()) + sum(c["penalties"].values()), 0, 100)
+    for k in list(board):
+        if now - board[k].get("last", 0) > 24 * 3600:
+            del board[k]
 
 
 # ---- run ------------------------------------------------------------------
@@ -774,10 +857,11 @@ def scan(write_state=True, stories=True):
     if extra:
         enrich(found, pairs, families)
 
-    skipped = {"small": 0, "big": 0, "illiquid": 0, "quiet": 0, "old": 0}
-    cands = []
+    skipped = {"small": 0, "big": 0, "illiquid": 0, "quiet": 0, "old": 0, "copy": 0}
+    cands, measured = [], []
     for key, got in pairs.items():
         m = measure(got["pair"], got["born"], found[key])
+        measured.append(m)
         role, fam = family_of(m, families)
         m["family_role"] = role
         if fam:
@@ -798,11 +882,14 @@ def scan(write_state=True, stories=True):
         cands.append(m)
 
     cands.sort(key=lambda c: -c["score"])
+    cands = drop_copies(cands, measured, state, skipped)
     cands = cands[:SHOW_TOP]
     if write_state:
         add_holders(cands, state)
     for c in cands:
         adjust_for_holders_and_family(c)
+    if write_state:
+        still_here(cands, state)
     cands.sort(key=lambda c: -c["score"])
 
     # Stories first: they change the score, and the saved score must be the
@@ -897,6 +984,8 @@ if __name__ == "__main__":
     if "--tg" in args and "--no-state" not in args:
         from tgping import ping
         print(f"telegram: sent {ping(res)}", file=sys.stderr)
+    if "--site" in args:                          # data for the public website (site.py)
+        (HOME / "board.json").write_text(json.dumps(res, default=str, ensure_ascii=False), encoding="utf-8")
     if "--html" in args:
         from render_html import build_new_html
         page = HOME / "dashboard.html"

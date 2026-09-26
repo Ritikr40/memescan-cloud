@@ -2,8 +2,8 @@
 """
 tgping - sends board coins to Ritik's Telegram.
 
-Each coin is sent ONCE, the first time it reaches the board, and once more
-if it later turns STRONG. Scans run every 5 minutes, so without this the same
+Each coin is sent ONCE, the first time it reaches the board, once more
+if it later turns STRONG, and once more if it is STILL HERE 2+ hours later. Scans run every 5 minutes, so without this the same
 coin would ping 12 times an hour.
 
 Setup (one time):
@@ -98,10 +98,13 @@ def social_lines(c):
     return out
 
 
-def message(c, upgrade):
+def message(c, upgrade, still=False):
     band = "🟢 STRONG" if c["score"] >= STRONG else "👀 WATCH"
     lane = {"new": "NEW", "family": "FAMILY"}.get(c["lane"], "WAKING UP")
-    head = "⬆️ NOW STRONG\n" if upgrade else ""
+    if still:
+        head = f"📌 STILL HERE after {c.get('board_h', 0):.0f} hours ({c.get('board_n', 0)} scans)\n"
+    else:
+        head = "⬆️ NOW STRONG\n" if upgrade else ""
     lines = [f"{head}<b>${esc(c['symbol'])}</b> ({esc(c['name'][:40])})",
              f"{band} {c['score']:.0f}/100 · {lane} · {c['chain']}",
              f"Size {money(c['mcap'])} · pool {money(c['liq'])} · {age(c['age_h'])} · 6h {c['chg6']:+.0f}%"]
@@ -146,12 +149,16 @@ def ping(res):
         key = f"{c['chain']}:{c['addr']}"
         strong = c["score"] >= STRONG
         was = sent.get(key)
-        if was and (was.get("strong") or not strong):
+        # at most three pings: the first time, when it turns STRONG, and once
+        # when it is STILL HERE hours later (winners stayed on the board longer)
+        still = bool(was) and bool(c.get("still_here")) and not was.get("still")
+        if was and not still and (was.get("strong") or not strong):
             continue                              # already told him
-        ok = api("sendMessage", chat_id=chat, text=message(c, upgrade=bool(was)),
+        ok = api("sendMessage", chat_id=chat, text=message(c, upgrade=bool(was) and not still, still=still),
                  parse_mode="HTML", disable_web_page_preview="true")
         if ok and ok.get("ok"):
-            sent[key] = {"t": now, "strong": strong, "sym": c["symbol"]}
+            sent[key] = {"t": now, "strong": strong or bool(was and was.get("strong")), "sym": c["symbol"],
+                         "still": still or bool(was and was.get("still"))}
             n += 1
             time.sleep(1)
     SENT_FILE.write_text(json.dumps(sent, indent=1, ensure_ascii=False), encoding="utf-8")
