@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>How it works · Memescan</title>
+<meta name="description" content="Memescan finds new memecoins early across Solana, Robinhood Chain, BNB Chain and Base, and publishes every call with its result.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232a78d6'/%3E%3Cpath d='M7 21l6-7 5 4 7-9' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<script>try{var t=localStorage.getItem("ms-theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head><body>
+<header class="top"><div class="wrap topin">
+  <a class="brand" href="index.html"><span class="logo" aria-hidden="true"></span>Memescan</a>
+  <nav class="nav"><a href="index.html">Overview</a><a href="board.html">Live board</a><a href="record.html">Track record</a><a href="method.html" aria-current=page>How it works</a></nav>
+  <button class="theme" id="theme" type="button" aria-label="Switch dark or light mode" title="Dark / light">
+    <svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>
+    <svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+  </button>
+</div></header>
+<main class="wrap">
+<section class="pagehead"><h1>How it works</h1>
+<p class="lede">Simple rules, all in code, run every 10 minutes. No paid data. Every call is saved before the result is known.</p></section>
+<div class="steps">
+  <div class="step"><span>1</span><h3>Collect</h3><p>Pull every fresh coin from DexScreener (new profiles, boosts,
+  community takeovers) and GeckoTerminal trending lists on Solana, Robinhood Chain, BNB Chain and Base.</p></div>
+  <div class="step"><span>2</span><h3>Filter</h3><p>Keep coins under 3 days old worth $250K – $20M with at least $50K in the pool,
+  plus coins 3 – 14 days old that are suddenly waking up, plus "family" coins that have many child coins built on them.</p></div>
+  <div class="step"><span>3</span><h3>Score</h3><p>0 – 100 from price direction, trading speed, buyers vs sellers, holder growth and sell risk
+  (how big the coin is compared with the money in its pool). Copies of a hot name are removed; only the original is called.</p></div>
+  <div class="step"><span>4</span><h3>Research</h3><p>Coins scoring 60+ get a short write-up by Claude from a web search: the story,
+  where it started, who talks about it, and red flags. It is there to read; it does not change the score.</p></div>
+  <div class="step"><span>5</span><h3>Alert &amp; record</h3><p>Each coin is sent to Telegram once, and saved with its price at that moment.
+  After that, its price is checked every 10 minutes for 7 days to build the track record.</p></div>
+</div>
+<section class="panel"><div class="ph2"><h2>Rules learned from the track record</h2>
+<p class="sub">From the first report card: 438 calls, 11 – 26 Sep 2026. Added on 27 Sep.</p></div>
+<ul class="plain">
+<li><b>Only the original.</b> Super Inu was called 10 times; only the 3 real coins won. Now a coin with the same name as a bigger coin is dropped.</li>
+<li><b>Still here = stronger.</b> Winners stayed on the board for a median of 5 scans, losers 2. A coin still on the board after 2 hours gets a bonus and a "still here" alert.</li>
+<li><b>Careful with brand-new coins and spikes.</b> Coins under 6 hours old won 12% of the time, older ones about 23%. A sudden 5x busier hour was more often a pump and dump.</li>
+<li><b>Earlier on big news.</b> Very busy coins can now get in from $100K, a 5-minute trending list is read every scan, and fast holder growth counts more.</li>
+<li><b>Stricter on Robinhood Chain.</b> 70% of its calls rugged, so it needs more money in the pool and more trades.</li>
+<li><b>Stories are for reading.</b> Claude called the story "weak" for 22 of the 23 winners it checked, so the story no longer lowers the score.</li>
+</ul></section>
+<section class="panel" id="exit"><div class="ph2"><h2>The exit plan</h2></div>
+<p>Tested on 26 past calls (24 Sep 2026): <b>sell half at 2x, then sell the rest if it falls 30% from its highest price.</b>
+Holding without a plan lost more than half the money on 17 of 26 coins. With the plan, 5 of 26 did.
+Most runners give back their whole run within days, so the exit matters more than the entry.</p></section>
+<section class="panel"><div class="ph2"><h2>Honest limits</h2></div>
+<ul class="plain">
+<li><b>Peaks are sampled.</b> Prices are checked every 10 minutes (before 24 Sep: hourly candles). A spike between two checks is missed, so real peaks were a bit higher than shown.</li>
+<li><b>Nobody sells exactly at the peak.</b> The Peak column shows what was possible, not what a trader made.</li>
+<li><b>Copycats.</b> Popular names get copied many times. The scanner flags repeats, but some copies still reach the board, and they show up in the record as losers.</li>
+<li><b>The score is still being tuned.</b> So far it separates good from bad coins only a little. Every call's details are saved so the score can be tested and improved.</li>
+<li><b>Quiet hours.</b> No scans from 2 AM to 11 AM IST. Coins that start and finish in that window are missed.</li>
+</ul></section></main>
+<footer class="foot"><div class="wrap">
+  <p>Updated 04 Oct, 1:50 AM IST. Scans every 10 minutes, 11 AM – 2 AM IST.</p>
+  <p>Signals only. Not financial advice. Memecoins are extremely risky; most go to zero.</p>
+</div></footer>
+<script>
+(function(){var b=document.getElementById("theme"),r=document.documentElement;
+function dark(){var t=r.getAttribute("data-theme");return t?t==="dark":matchMedia("(prefers-color-scheme: dark)").matches}
+b.addEventListener("click",function(){var n=dark()?"light":"dark";r.setAttribute("data-theme",n);try{localStorage.setItem("ms-theme",n)}catch(e){}});})();
+</script>
+
+</body></html>
