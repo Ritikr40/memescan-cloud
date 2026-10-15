@@ -46,6 +46,7 @@ jobs:
             stories.json
             scan_cache.json
             tg_sent.json
+            runner_sent.json
             new_history.jsonl
             track.json
             board.json
@@ -72,6 +73,7 @@ jobs:
           TG_CHAT: ${{ secrets.TG_CHAT }}
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           LOOP_MINUTES: ${{ vars.LOOP_MINUTES || '330' }}
+          EARLY_PINGS: ${{ vars.EARLY_PINGS || '0' }}
           GH_TOKEN: ${{ github.token }}
         run: bash loop.sh
 
@@ -84,6 +86,7 @@ jobs:
             stories.json
             scan_cache.json
             tg_sent.json
+            runner_sent.json
             new_history.jsonl
             track.json
             board.json

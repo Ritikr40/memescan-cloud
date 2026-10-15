@@ -13,9 +13,11 @@ while [ "$(date +%s)" -lt "$END" ]; do
   timeout 480 python3 newscan.py --tg --site > latest.txt 2> scan_err.txt
   # report card + website, never allowed to stop the scanning
   timeout 150 python3 tracker.py 2>> scan_err.txt || echo "tracker failed"
+  # RUNNER pings (2x+ and alive a day after the call) + Sunday digest
+  timeout 420 python3 runners.py 2>> scan_err.txt || echo "runners failed"
   python3 site.py 2>> scan_err.txt && bash publish.sh >/dev/null 2>> scan_err.txt || echo "website update failed"
   grep -E "^[0-9]+\. \$|coin\(s\) worth|Nothing worth" latest.txt || true
-  grep -E "telegram|FATAL|researching|tracker:|site:|publish" scan_err.txt || true
+  grep -E "telegram|FATAL|researching|tracker:|runners:|runner:|site:|publish" scan_err.txt || true
   grep -q Traceback scan_err.txt && tail -25 scan_err.txt
   wait_s=$(( ${SCAN_EVERY:-600} - ($(date +%s) - start) ))
   [ "$wait_s" -gt 0 ] && sleep "$wait_s"

@@ -134,8 +134,10 @@ def message(c, upgrade, still=False):
 
 
 def ping(res):
-    """Called by newscan.py after each scan with its result."""
-    if not token():
+    """Called by newscan.py after each scan with its result.
+    Off unless EARLY_PINGS=1: since report card #3 (16 Oct) the main ping is
+    the RUNNER ping from runners.py (2x+ and still alive a day after the call)."""
+    if not token() or os.environ.get("EARLY_PINGS", "0") != "1":
         return 0
     chat = chat_id()
     if not chat:

@@ -34,11 +34,13 @@ Usage:
 """
 
 import json
+import os
 import shutil
 import subprocess
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
@@ -77,6 +79,10 @@ STILL_HERE_HOURS = 2          # change 3: on the board this long ...
 STILL_HERE_SCANS = 8          # ... and in this many scans = a second, "still here" ping
 COPY_KEEP_H = 72              # change 2: remember tickers this long to spot copies
 COPY_LIQ_SHARE = 0.5          # under half the pool money of the biggest same-ticker coin = copy
+# report card #3 (16 Oct): 44 coins with a ".site" web address (same template, likely one
+# serial rugger) - 95% died, none survived. Coins with no links at all are dropped too.
+JUNK_SITE_ENDINGS = (".site",)
+EARLY_PINGS = os.environ.get("EARLY_PINGS", "0") == "1"   # first-sight pings + their stories (off: RUNNER pings only)
 
 MIN_SCORE = 45
 STRONG = 60
@@ -834,6 +840,14 @@ def still_here(cands, state):
 
 # ---- run ------------------------------------------------------------------
 
+def junk(m):
+    """Template rug coins: a ".site" web address, or no links at all."""
+    if not m.get("links"):
+        return True
+    hosts = [urllib.parse.urlparse(u).netloc.lower() for u in m["links"]]
+    return any(h.endswith(JUNK_SITE_ENDINGS) for h in hosts)
+
+
 def scan(write_state=True, stories=True):
     state = load_json(STATE_FILE, {"seen": {}, "last_run": None})
     seen = state.get("seen", {})
@@ -857,11 +871,14 @@ def scan(write_state=True, stories=True):
     if extra:
         enrich(found, pairs, families)
 
-    skipped = {"small": 0, "big": 0, "illiquid": 0, "quiet": 0, "old": 0, "copy": 0}
+    skipped = {"small": 0, "big": 0, "illiquid": 0, "quiet": 0, "old": 0, "copy": 0, "junk": 0}
     cands, measured = [], []
     for key, got in pairs.items():
         m = measure(got["pair"], got["born"], found[key])
         measured.append(m)
+        if junk(m):
+            skipped["junk"] += 1
+            continue
         role, fam = family_of(m, families)
         m["family_role"] = role
         if fam:
@@ -937,7 +954,7 @@ def render(res):
         s = res["skipped"]
         print(f"\n  Nothing worth showing right now. Checked {res['checked']} fresh coins.")
         print(f"  Skipped: {s['small']} too small, {s['big']} too big, {s['illiquid']} unsellable, "
-              f"{s['quiet']} too quiet, {s['old']} old and asleep.")
+              f"{s['quiet']} too quiet, {s['old']} old and asleep, {s.get('junk', 0)} junk (.site / no links).")
         return
 
     strong = [c for c in cands if c["score"] >= STRONG]
@@ -978,7 +995,8 @@ if __name__ == "__main__":
             pass
 
     args = sys.argv[1:]
-    res = scan(write_state="--no-state" not in args, stories="--no-story" not in args)
+    res = scan(write_state="--no-state" not in args,
+               stories="--no-story" not in args and (EARLY_PINGS or "--story" in args))
     if isinstance(res, int):
         sys.exit(res)
     if "--tg" in args and "--no-state" not in args:
